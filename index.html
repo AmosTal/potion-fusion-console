@@ -118,7 +118,7 @@
     <div class="tabs">
       <button data-tab="dash" class="on">Dashboard</button>
       <button data-tab="cfg">Live-Ops Config</button>
-      <button data-tab="fish">Fish Economy</button>
+      <button data-tab="fish">Aquarium Economy</button>
       <button data-tab="audit">Audit</button>
       <button data-tab="admins">Admins</button>
     </div>
@@ -198,6 +198,23 @@
         <h2>Album progress — species discovered per player (30d)</h2>
         <div class="scroll" id="tblAlbum"></div>
       </div>
+      <div class="card">
+        <h2>Tank chase — stars earned and tanks finished (30d)</h2>
+        <p class="hint" style="margin:0 0 6px">Where the decorating loop stalls. If
+          players pile up on one tank index, lower <code>tank_star*</code> or
+          <code>decor_price_mult</code> for that stretch.</p>
+        <div class="scroll" id="tblTank"></div>
+      </div>
+      <div class="card">
+        <h2>Ornament sales — the main coin sink (30d)</h2>
+        <div class="scroll" id="tblDecor"></div>
+      </div>
+      <div class="card">
+        <h2>Coin flow — sources vs sinks (30d)</h2>
+        <p class="hint" style="margin:0 0 6px">The aquarium should be the biggest
+          OUT line. If IN dwarfs OUT, players are hoarding and the chase is too cheap.</p>
+        <div class="scroll" id="tblFlow"></div>
+      </div>
     </div>
 
     <div id="tab-audit" style="display:none">
@@ -249,10 +266,11 @@ const NUM_FIELDS = [
   ['food_cost',    'Food pack cost',     40],
   ['food_qty',     'Food pack size',      5],
   ['egg_cost',     'Mystery egg cost',  150],
-  ['aqua_base',    'Aquarium payout base', 6],
-  ['aqua_fish',    'Payout + per fish',    2],
-  ['aqua_adult',   'Payout + per adult',   4],
-  ['aqua_cap',     'Aquarium payout cap', 150],
+  ['tank_star1',   'Tank star 1 (beauty)',  60],
+  ['tank_star2',   'Tank star 2 (beauty)', 170],
+  ['tank_star3',   'Tank star 3 (beauty)', 340],
+  ['tank_mult',    'Per-tank goal x',      1.8],
+  ['decor_price_mult', 'Ornament price x',   1],
 ];
 /* Drop table — mirrors SPECIES in game/fish.js (name, default weight).
    Keep in sync when a species is added there. */
@@ -364,10 +382,12 @@ async function loadAll() {
   loadAdmins();
   try {
     const [kpis, ads, shop, aqua, boost, ret, funnel, errs, x2,
-           fishEcon, fishRet, album, audit, cfgHist] = await Promise.all(
+           fishEcon, fishRet, album, audit, cfgHist,
+           tankProg, decorSales, coinFlow] = await Promise.all(
       ['daily_kpis', 'ads_funnel', 'shop_metrics', 'aquarium_engagement', 'booster_usage', 'retention', 'level_funnel',
        'client_errors', 'x2_adoption',
-       'fish_economy', 'fish_retention', 'album_progress', 'audit', 'config_history']
+       'fish_economy', 'fish_retention', 'album_progress', 'audit', 'config_history',
+       'tank_progress', 'decor_sales', 'coin_flow']
         .map(n => rpc('ops_stats', { name: n }).catch(() => [])));
     const today = kpis[0] || {};
     $('kpiCards').innerHTML = [
@@ -399,6 +419,11 @@ async function loadAll() {
     table($('tblAlbum'), album, [['seen', 'Species found'], ['opens', 'Album opens'], ['devices', 'Players']]);
     table($('tblAudit'), audit, [['ts', 'When', v => String(v).slice(0, 16).replace('T', ' ')],
       ['actor', 'Actor'], ['action', 'Action'], ['version', 'Cfg v'], ['summary', 'Change']]);
+    table($('tblTank'), tankProg, [['tank', 'Tank #'], ['stars_earned', 'Stars earned'],
+      ['tanks_finished', 'Finished'], ['players', 'Players'], ['avg_beauty', 'Avg beauty']]);
+    table($('tblDecor'), decorSales, [['item', 'Ornament'], ['bought', 'Bought'],
+      ['players', 'Players'], ['coins_sunk', 'Coins sunk'], ['pct_of_buys', 'Share', pct]]);
+    table($('tblFlow'), coinFlow, [['day', 'Day'], ['flow', 'Flow'], ['amount', 'Coins'], ['events', 'Events']]);
     table($('tblCfgHist'), cfgHist, [['version', 'Version'],
       ['ts', 'Published', v => String(v).slice(0, 16).replace('T', ' ')],
       ['actor', 'By'], ['keys_changed', 'Keys'], ['changes', 'Diff']]);
