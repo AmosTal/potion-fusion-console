@@ -180,7 +180,7 @@ const LS = { conn: 'pfops_conn', sess: 'pfops_session' };
 const S = { url: '', key: '', session: null, admin: false, cfg: null, cfgMeta: null };
 
 const NUM_FIELDS = [
-  ['hint_cost',    'Hint cost',          25],
+  ['hint_cost',    'Hint cost (legacy)', 25],
   ['shuffle_cost', 'Shuffle cost',       35],
   ['vial_cost',    '+Vial cost',         50],
   ['vial_max',     'Vials max / level',   2],
@@ -192,6 +192,10 @@ const NUM_FIELDS = [
   ['food_cost',    'Food pack cost',     40],
   ['food_qty',     'Food pack size',      5],
   ['egg_cost',     'Mystery egg cost',  150],
+  ['aqua_base',    'Aquarium payout base', 6],
+  ['aqua_fish',    'Payout + per fish',    2],
+  ['aqua_adult',   'Payout + per adult',   4],
+  ['aqua_cap',     'Aquarium payout cap', 150],
 ];
 
 /* ------------------------------------------------------------------ utils */
