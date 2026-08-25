@@ -127,6 +127,8 @@
       <div class="card"><h2>Rewarded ads funnel (30d, by placement)</h2><div class="scroll" id="tblAds"></div></div>
       <div class="card"><h2>Shop purchases (30d)</h2><div class="scroll" id="tblShop"></div></div>
       <div class="card"><h2>Aquarium engagement (30d)</h2><div class="scroll" id="tblAqua"></div></div>
+      <div class="card"><h2>Client errors (30d) — crash watch</h2><div class="scroll" id="tblErr"></div></div>
+      <div class="card"><h2>×2-ad adoption on wins (30d)</h2><div class="scroll" id="tblX2"></div></div>
       <div class="card"><h2>Booster usage (all time)</h2><div class="scroll" id="tblBoost"></div></div>
       <div class="card"><h2>Retention (D1 / D7 by install cohort)</h2><div class="scroll" id="tblRet"></div></div>
       <div class="card"><h2>Level funnel</h2><div class="scroll" id="tblFunnel"></div></div>
@@ -278,9 +280,10 @@ async function loadAll() {
   loadConfig();
   loadAdmins();
   try {
-    const [kpis, ads, shop, aqua, boost, ret, funnel] = await Promise.all(
-      ['daily_kpis', 'ads_funnel', 'shop_metrics', 'aquarium_engagement', 'booster_usage', 'retention', 'level_funnel']
-        .map(n => rpc('ops_stats', { name: n })));
+    const [kpis, ads, shop, aqua, boost, ret, funnel, errs, x2] = await Promise.all(
+      ['daily_kpis', 'ads_funnel', 'shop_metrics', 'aquarium_engagement', 'booster_usage', 'retention', 'level_funnel',
+       'client_errors', 'x2_adoption']
+        .map(n => rpc('ops_stats', { name: n }).catch(() => [])));
     const today = kpis[0] || {};
     $('kpiCards').innerHTML = [
       ['DAU (latest day)', today.dau], ['Sessions', today.sessions],
@@ -293,6 +296,9 @@ async function loadAll() {
       ['completed', 'Completed'], ['abandoned', 'Abandoned'], ['rewarded', 'Rewarded']]);
     table($('tblShop'), shop, [['day', 'Day'], ['item', 'Item'], ['purchases', 'Purchases'], ['coins_spent', 'Coins']]);
     table($('tblAqua'), aqua, [['day', 'Day'], ['opens', 'Tank opens'], ['feeds', 'Feeds'], ['devices', 'Devices']]);
+    table($('tblErr'), errs, [['day', 'Day'], ['message', 'Error'], ['source', 'File'],
+      ['hits', 'Hits'], ['devices', 'Devices'], ['last_version', 'Version']]);
+    table($('tblX2'), x2, [['day', 'Day'], ['x2_collects', '×2 collects'], ['plain_collects', 'Plain collects']]);
     table($('tblBoost'), boost, [['booster', 'Booster'], ['uses', 'Uses'], ['free_uses', 'Free'],
       ['coins_spent', 'Coins'], ['unique_users', 'Users']]);
     table($('tblRet'), ret, [['cohort_date', 'Cohort'], ['cohort_size', 'Installs'],
