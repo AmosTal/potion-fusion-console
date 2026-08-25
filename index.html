@@ -118,6 +118,8 @@
     <div class="tabs">
       <button data-tab="dash" class="on">Dashboard</button>
       <button data-tab="cfg">Live-Ops Config</button>
+      <button data-tab="fish">Fish Economy</button>
+      <button data-tab="audit">Audit</button>
       <button data-tab="admins">Admins</button>
     </div>
 
@@ -147,6 +149,27 @@
         </div>
         <label>Player notice (toast shown once per config version)</label>
         <input id="fnotice" placeholder="e.g. Double gift week — check the daily chest!">
+      </div>
+      <div class="card">
+        <h2>Fish drop table</h2>
+        <p class="hint" style="margin:0 0 6px">Relative weights — a species' chance is its
+          weight over the total. Blank = the rarity baked into the game (shown as
+          placeholder). Live odds are recomputed below as you type.</p>
+        <div class="cfg-grid" id="cfgFish"></div>
+        <p class="hint" id="oddsOut" style="margin:8px 0 0"></p>
+      </div>
+      <div class="card">
+        <h2>Hunger clock</h2>
+        <p class="hint" style="margin:0 0 6px">Hours since a fish last ate before it turns
+          hungry, starving, then leaves the tank. Kept monotonic by the client.</p>
+        <div class="cfg-grid" id="cfgHunger"></div>
+        <div class="switch">
+          <input type="checkbox" id="floss" checked>
+          <label for="floss" style="margin:0">Fish can be lost to hunger (uncheck to disable losses everywhere)</label>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Publish</h2>
         <label>Raw config JSON (advanced — this exact object is published)</label>
         <textarea id="fraw" rows="6" spellcheck="false"></textarea>
         <div class="row" style="margin-top:12px">
@@ -154,6 +177,40 @@
           <button class="ghost" id="btnReload">Reload current</button>
           <span class="chip" id="chipCfg2"></span>
         </div>
+      </div>
+    </div>
+
+    <div id="tab-fish" style="display:none">
+      <div class="card">
+        <h2>Drop table — what the weights actually produced (30d)</h2>
+        <p class="hint" style="margin:0 0 6px">Grants by species against the published
+          weights. If a species' share drifts far from its intended odds, retune
+          <code>fish_w_&lt;species&gt;</code> in Live-Ops Config.</p>
+        <div class="scroll" id="tblFishEcon"></div>
+      </div>
+      <div class="card">
+        <h2>Fish gained vs lost to hunger (30d)</h2>
+        <p class="hint" style="margin:0 0 6px">Losses are fish that went unfed past
+          <code>fish_lose_h</code>. A rising ratio means the hunger clock is too harsh.</p>
+        <div class="scroll" id="tblFishRet"></div>
+      </div>
+      <div class="card">
+        <h2>Album progress — species discovered per player (30d)</h2>
+        <div class="scroll" id="tblAlbum"></div>
+      </div>
+    </div>
+
+    <div id="tab-audit" style="display:none">
+      <div class="card">
+        <h2>Audit trail</h2>
+        <p class="hint" style="margin:0 0 6px">Every config publish and admin change,
+          newest first — actor, action and the exact per-key diff. Written by the
+          database itself (<code>ops.audit</code>), readable only by admins.</p>
+        <div class="scroll" id="tblAudit"></div>
+      </div>
+      <div class="card">
+        <h2>Config version history</h2>
+        <div class="scroll" id="tblCfgHist"></div>
       </div>
     </div>
 
@@ -197,6 +254,28 @@ const NUM_FIELDS = [
   ['aqua_adult',   'Payout + per adult',   4],
   ['aqua_cap',     'Aquarium payout cap', 150],
 ];
+/* Drop table — mirrors SPECIES in game/fish.js (name, default weight).
+   Keep in sync when a species is added there. */
+const FISH_FIELDS = [
+  ['fish_w_goldfish',  'Goldfish (common)',    100],
+  ['fish_w_tetra',     'Tetra (common)',       100],
+  ['fish_w_guppy',     'Guppy (common)',       100],
+  ['fish_w_betta',     'Betta (uncommon)',      55],
+  ['fish_w_clownfish', 'Clownfish (uncommon)',  55],
+  ['fish_w_angelfish', 'Angelfish (rare)',      24],
+  ['fish_w_catfish',   'Catfish (rare)',        24],
+  ['fish_w_koi',       'Koi (rare)',            22],
+  ['fish_w_dragonet',  'Dragonet (rare)',       20],
+  ['fish_w_puffer',    'Puffer (epic)',          9],
+  ['fish_w_lionfish',  'Lionfish (epic)',        8],
+  ['fish_w_moonfish',  'Moonfish (legendary)',   3],
+];
+const HUNGER_FIELDS = [
+  ['fish_hungry_h', 'Hours until hungry',   24],
+  ['fish_starve_h', 'Hours until starving', 48],
+  ['fish_lose_h',   'Hours until lost',     72],
+];
+const ALL_NUM = () => NUM_FIELDS.concat(FISH_FIELDS, HUNGER_FIELDS);
 
 /* ------------------------------------------------------------------ utils */
 const $ = id => document.getElementById(id);
@@ -284,9 +363,11 @@ async function loadAll() {
   loadConfig();
   loadAdmins();
   try {
-    const [kpis, ads, shop, aqua, boost, ret, funnel, errs, x2] = await Promise.all(
+    const [kpis, ads, shop, aqua, boost, ret, funnel, errs, x2,
+           fishEcon, fishRet, album, audit, cfgHist] = await Promise.all(
       ['daily_kpis', 'ads_funnel', 'shop_metrics', 'aquarium_engagement', 'booster_usage', 'retention', 'level_funnel',
-       'client_errors', 'x2_adoption']
+       'client_errors', 'x2_adoption',
+       'fish_economy', 'fish_retention', 'album_progress', 'audit', 'config_history']
         .map(n => rpc('ops_stats', { name: n }).catch(() => [])));
     const today = kpis[0] || {};
     $('kpiCards').innerHTML = [
@@ -310,35 +391,69 @@ async function loadAll() {
     table($('tblFunnel'), funnel, [['level', 'Level'], ['starts', 'Starts'], ['completes', 'Completes'],
       ['completion_pct', 'Completion', pct], ['restarts', 'Restarts'], ['avg_moves', 'Avg moves'],
       ['avg_seconds', 'Avg s'], ['avg_stars', 'Avg ★']]);
+    table($('tblFishEcon'), fishEcon, [['species', 'Species'], ['rarity', 'Rarity'], ['granted', 'Granted'],
+      ['pct_of_grants', 'Share', pct], ['from_level', 'From level'], ['from_egg', 'From egg'],
+      ['first_time', 'First-time'], ['devices', 'Players']]);
+    table($('tblFishRet'), fishRet, [['day', 'Day'], ['gained', 'Gained'], ['lost_to_hunger', 'Lost'],
+      ['feeds', 'Feeds'], ['devices_losing', 'Players losing']]);
+    table($('tblAlbum'), album, [['seen', 'Species found'], ['opens', 'Album opens'], ['devices', 'Players']]);
+    table($('tblAudit'), audit, [['ts', 'When', v => String(v).slice(0, 16).replace('T', ' ')],
+      ['actor', 'Actor'], ['action', 'Action'], ['version', 'Cfg v'], ['summary', 'Change']]);
+    table($('tblCfgHist'), cfgHist, [['version', 'Version'],
+      ['ts', 'Published', v => String(v).slice(0, 16).replace('T', ' ')],
+      ['actor', 'By'], ['keys_changed', 'Keys'], ['changes', 'Diff']]);
   } catch (e) { say('err', 'Stats failed: ' + e.message); }
 }
 
 /* ---------------------------------------------------------------- config */
-function cfgFieldsInit() {
-  $('cfgFields').innerHTML = NUM_FIELDS.map(f =>
+function fieldsHtml(list) {
+  return list.map(f =>
     '<div><label>' + esc(f[1]) + '</label><input id="f_' + f[0] + '" type="number" placeholder="' + f[2] + '"></div>').join('');
-  for (const f of NUM_FIELDS) $('f_' + f[0]).addEventListener('input', syncRaw);
+}
+function cfgFieldsInit() {
+  $('cfgFields').innerHTML = fieldsHtml(NUM_FIELDS);
+  $('cfgFish').innerHTML = fieldsHtml(FISH_FIELDS);
+  $('cfgHunger').innerHTML = fieldsHtml(HUNGER_FIELDS);
+  for (const f of ALL_NUM()) $('f_' + f[0]).addEventListener('input', syncRaw);
   $('fx2').addEventListener('change', syncRaw);
+  $('floss').addEventListener('change', syncRaw);
   $('fnotice').addEventListener('input', syncRaw);
 }
 function formToCfg() {
   const c = {};
-  for (const f of NUM_FIELDS) {
+  for (const f of ALL_NUM()) {
     const v = $('f_' + f[0]).value.trim();
     if (v !== '' && isFinite(Number(v))) c[f[0]] = Number(v);
   }
   if (!$('fx2').checked) c.x2_enabled = false;
+  if (!$('floss').checked) c.fish_loss_enabled = false;
   const note = $('fnotice').value.trim();
   if (note) c.notice = note;
   return c;
 }
 function cfgToForm(c) {
-  for (const f of NUM_FIELDS) $('f_' + f[0]).value = c[f[0]] != null ? c[f[0]] : '';
+  for (const f of ALL_NUM()) $('f_' + f[0]).value = c[f[0]] != null ? c[f[0]] : '';
   $('fx2').checked = c.x2_enabled !== false;
+  $('floss').checked = c.fish_loss_enabled !== false;
   $('fnotice').value = c.notice || '';
   $('fraw').value = JSON.stringify(c, null, 2);
+  renderOdds();
 }
-function syncRaw() { $('fraw').value = JSON.stringify(formToCfg(), null, 2); }
+/* Live odds preview: the same weight->probability math the game runs, so a
+   publisher sees the real drop chances before hitting Publish. */
+function renderOdds() {
+  const ws = FISH_FIELDS.map(f => {
+    const v = $('f_' + f[0]).value.trim();
+    return (v !== '' && isFinite(Number(v)) && Number(v) >= 0) ? Number(v) : f[2];
+  });
+  const tot = ws.reduce((a, b) => a + b, 0);
+  $('oddsOut').innerHTML = tot <= 0
+    ? 'All weights are zero — the game falls back to an even chance per species.'
+    : 'Live odds: ' + FISH_FIELDS.map((f, i) =>
+        '<b>' + esc(f[1].replace(/ \(.*/, '')) + '</b> ' + (100 * ws[i] / tot).toFixed(ws[i] / tot < 0.02 ? 1 : 0) + '%'
+      ).join(' · ');
+}
+function syncRaw() { $('fraw').value = JSON.stringify(formToCfg(), null, 2); renderOdds(); }
 async function loadConfig() {
   try {
     const d = await rpc('get_remote_config', {});
@@ -375,7 +490,7 @@ async function loadAdmins() {
 /* ------------------------------------------------------------------ boot */
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
-  for (const t of ['dash', 'cfg', 'admins']) $('tab-' + t).style.display = b.dataset.tab === t ? '' : 'none';
+  for (const t of ['dash', 'cfg', 'fish', 'audit', 'admins']) $('tab-' + t).style.display = b.dataset.tab === t ? '' : 'none';
 }));
 $('btnConnect').addEventListener('click', () => {
   const url = $('inUrl').value.trim().replace(/\/+$/, ''), key = $('inKey').value.trim();
