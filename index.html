@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Potion Fusion Ops</title>
+<style>
+  :root {
+    --bg: #0f1222; --panel: #171b31; --panel2: #1d2240; --line: #2a3055;
+    --text: #e8eaf6; --dim: #9aa1c7; --acc: #8f6bff; --acc2: #5ee7d4;
+    --good: #4cd97b; --bad: #ff6b81; --warn: #ffc93c;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, Segoe UI, Roboto, sans-serif; }
+  a { color: var(--acc2); }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 18px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  header h1 { font-size: 19px; letter-spacing: .3px; }
+  header .flask { font-size: 22px; }
+  .chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 12px; color: var(--dim); }
+  .chip b { color: var(--text); font-weight: 600; }
+  .spacer { flex: 1; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); margin-bottom: 12px; }
+  label { display: block; font-size: 12px; color: var(--dim); margin: 10px 0 4px; }
+  input, textarea, select {
+    width: 100%; background: #10142a; color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; font: inherit;
+  }
+  textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  input:focus, textarea:focus { outline: none; border-color: var(--acc); }
+  button {
+    background: var(--acc); color: #fff; border: 0; border-radius: 9px; padding: 9px 16px;
+    font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--dim); }
+  button.small { padding: 5px 10px; font-size: 12px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .grid { display: grid; gap: 12px; }
+  .grid.cards { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .kpi { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .kpi .v { font-size: 24px; font-weight: 700; margin-top: 2px; }
+  .kpi .l { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tabs button { background: var(--panel); border: 1px solid var(--line); color: var(--dim); }
+  .tabs button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .scroll { overflow-x: auto; }
+  .cfg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 4px 18px; }
+  .msg { padding: 10px 12px; border-radius: 9px; margin: 10px 0; font-size: 13px; display: none; }
+  .msg.err { display: block; background: rgba(255,107,129,.12); border: 1px solid rgba(255,107,129,.45); color: var(--bad); }
+  .msg.ok { display: block; background: rgba(76,217,123,.10); border: 1px solid rgba(76,217,123,.4); color: var(--good); }
+  .hint { font-size: 12px; color: var(--dim); margin-top: 8px; }
+  .auth-box { max-width: 420px; margin: 6vh auto 0; }
+  .pill-good { color: var(--good); } .pill-bad { color: var(--bad); }
+  .switch { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .switch input { width: auto; }
+  footer { color: var(--dim); font-size: 11.5px; margin: 18px 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="flask">🧪</span><h1>Potion Fusion Ops</h1>
+    <span class="chip" id="chipProj" style="display:none"></span>
+    <span class="chip" id="chipCfg" style="display:none"></span>
+    <span class="spacer"></span>
+    <span class="chip" id="chipUser" style="display:none"></span>
+    <button class="ghost small" id="btnOut" style="display:none">Sign out</button>
+  </header>
+
+  <div id="msg" class="msg"></div>
+
+  <!-- STEP 1: connect -->
+  <div class="card auth-box" id="viewConnect" style="display:none">
+    <h2>Connect to your Supabase project</h2>
+    <label>Project URL</label>
+    <input id="inUrl" placeholder="https://xxxx.supabase.co" autocomplete="off">
+    <label>Anon (public) key</label>
+    <input id="inKey" placeholder="eyJhbGciOi..." autocomplete="off">
+    <div class="row" style="margin-top:14px"><button id="btnConnect">Continue</button></div>
+    <p class="hint">Project Settings → API. Stored only in this browser. The console
+      talks straight to your project — this page is a static file and has no backend
+      of its own.</p>
+  </div>
+
+  <!-- STEP 2: sign in -->
+  <div class="card auth-box" id="viewLogin" style="display:none">
+    <h2>Admin sign in</h2>
+    <label>Email</label>
+    <input id="inEmail" type="email" autocomplete="username">
+    <label>Password</label>
+    <input id="inPass" type="password" autocomplete="current-password">
+    <div class="row" style="margin-top:14px">
+      <button id="btnLogin">Sign in</button>
+      <button class="ghost" id="btnSignup">Create account</button>
+      <span class="spacer"></span>
+      <button class="ghost small" id="btnReconn">Change project</button>
+    </div>
+    <p class="hint">The first account to sign in claims the admin seat automatically
+      (RPC <code>claim_admin</code>); after that, existing admins add others in the
+      Admins tab.</p>
+  </div>
+
+  <!-- STEP 3: not an admin -->
+  <div class="card auth-box" id="viewDenied" style="display:none">
+    <h2>Signed in, but not an admin</h2>
+    <p>Ask an existing admin to add <b id="deniedMail"></b> in the Admins tab, then reload.</p>
+  </div>
+
+  <!-- console -->
+  <div id="viewApp" style="display:none">
+    <div class="tabs">
+      <button data-tab="dash" class="on">Dashboard</button>
+      <button data-tab="cfg">Live-Ops Config</button>
+      <button data-tab="admins">Admins</button>
+    </div>
+
+    <div id="tab-dash">
+      <div class="grid cards" id="kpiCards"></div>
+      <div class="card"><h2>Daily KPIs (30d)</h2><div class="scroll" id="tblKpis"></div></div>
+      <div class="card"><h2>Rewarded ads funnel (30d, by placement)</h2><div class="scroll" id="tblAds"></div></div>
+      <div class="card"><h2>Shop purchases (30d)</h2><div class="scroll" id="tblShop"></div></div>
+      <div class="card"><h2>Aquarium engagement (30d)</h2><div class="scroll" id="tblAqua"></div></div>
+      <div class="card"><h2>Booster usage (all time)</h2><div class="scroll" id="tblBoost"></div></div>
+      <div class="card"><h2>Retention (D1 / D7 by install cohort)</h2><div class="scroll" id="tblRet"></div></div>
+      <div class="card"><h2>Level funnel</h2><div class="scroll" id="tblFunnel"></div></div>
+    </div>
+
+    <div id="tab-cfg" style="display:none">
+      <div class="card">
+        <h2>Economy &amp; monetization overrides</h2>
+        <p class="hint" style="margin:0 0 6px">Blank = use the value baked into the game
+          (shown as placeholder). Published values reach every install on next launch —
+          cached offline, refreshed in the background.</p>
+        <div class="cfg-grid" id="cfgFields"></div>
+        <div class="switch">
+          <input type="checkbox" id="fx2" checked>
+          <label for="fx2" style="margin:0">Win-screen ×2-coins ad button enabled</label>
+        </div>
+        <label>Player notice (toast shown once per config version)</label>
+        <input id="fnotice" placeholder="e.g. Double gift week — check the daily chest!">
+        <label>Raw config JSON (advanced — this exact object is published)</label>
+        <textarea id="fraw" rows="6" spellcheck="false"></textarea>
+        <div class="row" style="margin-top:12px">
+          <button id="btnPublish">Publish config</button>
+          <button class="ghost" id="btnReload">Reload current</button>
+          <span class="chip" id="chipCfg2"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-admins" style="display:none">
+      <div class="card">
+        <h2>Console admins</h2>
+        <div class="scroll" id="tblAdmins"></div>
+        <div class="row" style="margin-top:12px">
+          <input id="inNewAdmin" placeholder="teammate@email.com — must have signed in once" style="max-width:340px">
+          <button id="btnAddAdmin">Add admin</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Static single-file console · auth &amp; data via your Supabase project only ·
+    config served to the game by <code>get_remote_config</code></footer>
+</div>
+
+<script>
+'use strict';
+/* ------------------------------------------------------------------ state */
+const LS = { conn: 'pfops_conn', sess: 'pfops_session' };
+const S = { url: '', key: '', session: null, admin: false, cfg: null, cfgMeta: null };
+
+const NUM_FIELDS = [
+  ['hint_cost',    'Hint cost',          25],
+  ['shuffle_cost', 'Shuffle cost',       35],
+  ['vial_cost',    '+Vial cost',         50],
+  ['vial_max',     'Vials max / level',   2],
+  ['gift_base',    'Daily gift base',    20],
+  ['gift_per',     'Gift +/streak day',   5],
+  ['gift_cap',     'Daily gift cap',     40],
+  ['ads_per_day',  'Rewarded ads / day',  5],
+  ['ad_reward',    'Shop ad reward',     30],
+  ['food_cost',    'Food pack cost',     40],
+  ['food_qty',     'Food pack size',      5],
+  ['egg_cost',     'Mystery egg cost',  150],
+];
+
+/* ------------------------------------------------------------------ utils */
+const $ = id => document.getElementById(id);
+function say(kind, text) {
+  const m = $('msg'); m.className = 'msg ' + kind; m.textContent = text;
+  if (kind === 'ok') setTimeout(() => { if (m.textContent === text) m.className = 'msg'; }, 3500);
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function table(el, rows, cols) {
+  if (!rows || !rows.length) { el.innerHTML = '<p class="hint">No data yet.</p>'; return; }
+  const heads = cols.map(c => '<th>' + esc(c[1]) + '</th>').join('');
+  const body = rows.map(r => '<tr>' + cols.map(c =>
+    '<td>' + esc(typeof c[2] === 'function' ? c[2](r[c[0]], r) : (r[c[0]] == null ? '—' : r[c[0]])) + '</td>').join('') + '</tr>').join('');
+  el.innerHTML = '<table><thead><tr>' + heads + '</tr></thead><tbody>' + body + '</tbody></table>';
+}
+
+/* ------------------------------------------------------------- transport */
+async function rpc(name, body, retried) {
+  const token = S.session ? S.session.access_token : S.key;
+  const r = await fetch(S.url + '/rest/v1/rpc/' + name, {
+    method: 'POST',
+    headers: { apikey: S.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  if (r.status === 401 && S.session && !retried) {
+    if (await refreshSession()) return rpc(name, body, true);
+  }
+  const text = await r.text();
+  if (!r.ok) {
+    let msg = text;
+    try { msg = JSON.parse(text).message || text; } catch (e) {}
+    throw new Error(msg.slice(0, 300));
+  }
+  return text ? JSON.parse(text) : null;
+}
+async function auth(path, body) {
+  const r = await fetch(S.url + '/auth/v1/' + path, {
+    method: 'POST',
+    headers: { apikey: S.key, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.msg || data.error_description || data.message || ('auth error ' + r.status));
+  return data;
+}
+async function refreshSession() {
+  try {
+    const d = await auth('token?grant_type=refresh_token', { refresh_token: S.session.refresh_token });
+    S.session = d; localStorage.setItem(LS.sess, JSON.stringify(d));
+    return true;
+  } catch (e) { signOut(); return false; }
+}
+function signOut() {
+  S.session = null; S.admin = false;
+  localStorage.removeItem(LS.sess);
+  route();
+}
+
+/* ----------------------------------------------------------------- views */
+function show(view) {
+  for (const v of ['viewConnect', 'viewLogin', 'viewDenied', 'viewApp']) $(v).style.display = 'none';
+  $(view).style.display = '';
+  const authed = !!S.session;
+  $('chipUser').style.display = authed ? '' : 'none';
+  $('btnOut').style.display = authed ? '' : 'none';
+  if (authed) $('chipUser').innerHTML = '👤 <b>' + esc(S.session.user && S.session.user.email) + '</b>';
+  $('chipProj').style.display = S.url ? '' : 'none';
+  if (S.url) $('chipProj').innerHTML = '🔌 <b>' + esc(S.url.replace(/^https?:\/\//, '').split('.')[0]) + '</b>';
+}
+async function route() {
+  if (!S.url || !S.key) return show('viewConnect');
+  if (!S.session) return show('viewLogin');
+  try {
+    S.admin = await rpc('claim_admin', {});
+  } catch (e) { say('err', 'claim_admin failed: ' + e.message + ' — did you run migration 0003?'); return show('viewLogin'); }
+  if (!S.admin) { $('deniedMail').textContent = (S.session.user && S.session.user.email) || ''; return show('viewDenied'); }
+  $('msg').className = 'msg';
+  show('viewApp');
+  loadAll();
+}
+
+/* ------------------------------------------------------------- dashboard */
+function pct(v) { return v == null ? '—' : v + '%'; }
+async function loadAll() {
+  loadConfig();
+  loadAdmins();
+  try {
+    const [kpis, ads, shop, aqua, boost, ret, funnel] = await Promise.all(
+      ['daily_kpis', 'ads_funnel', 'shop_metrics', 'aquarium_engagement', 'booster_usage', 'retention', 'level_funnel']
+        .map(n => rpc('ops_stats', { name: n })));
+    const today = kpis[0] || {};
+    $('kpiCards').innerHTML = [
+      ['DAU (latest day)', today.dau], ['Sessions', today.sessions],
+      ['Levels cleared', today.levels_completed],
+      ['Coins earned', today.coins_earned], ['Coins spent', today.coins_spent],
+    ].map(k => '<div class="kpi"><div class="l">' + k[0] + '</div><div class="v">' + esc(k[1] == null ? '—' : k[1]) + '</div></div>').join('');
+    table($('tblKpis'), kpis, [['day', 'Day'], ['dau', 'DAU'], ['sessions', 'Sessions'],
+      ['levels_completed', 'Cleared'], ['restarts', 'Restarts'], ['coins_earned', 'Coins +'], ['coins_spent', 'Coins −']]);
+    table($('tblAds'), ads, [['day', 'Day'], ['placement', 'Placement'], ['started', 'Started'],
+      ['completed', 'Completed'], ['abandoned', 'Abandoned'], ['rewarded', 'Rewarded']]);
+    table($('tblShop'), shop, [['day', 'Day'], ['item', 'Item'], ['purchases', 'Purchases'], ['coins_spent', 'Coins']]);
+    table($('tblAqua'), aqua, [['day', 'Day'], ['opens', 'Tank opens'], ['feeds', 'Feeds'], ['devices', 'Devices']]);
+    table($('tblBoost'), boost, [['booster', 'Booster'], ['uses', 'Uses'], ['free_uses', 'Free'],
+      ['coins_spent', 'Coins'], ['unique_users', 'Users']]);
+    table($('tblRet'), ret, [['cohort_date', 'Cohort'], ['cohort_size', 'Installs'],
+      ['d1_pct', 'D1', pct], ['d7_pct', 'D7', pct]]);
+    table($('tblFunnel'), funnel, [['level', 'Level'], ['starts', 'Starts'], ['completes', 'Completes'],
+      ['completion_pct', 'Completion', pct], ['restarts', 'Restarts'], ['avg_moves', 'Avg moves'],
+      ['avg_seconds', 'Avg s'], ['avg_stars', 'Avg ★']]);
+  } catch (e) { say('err', 'Stats failed: ' + e.message); }
+}
+
+/* ---------------------------------------------------------------- config */
+function cfgFieldsInit() {
+  $('cfgFields').innerHTML = NUM_FIELDS.map(f =>
+    '<div><label>' + esc(f[1]) + '</label><input id="f_' + f[0] + '" type="number" placeholder="' + f[2] + '"></div>').join('');
+  for (const f of NUM_FIELDS) $('f_' + f[0]).addEventListener('input', syncRaw);
+  $('fx2').addEventListener('change', syncRaw);
+  $('fnotice').addEventListener('input', syncRaw);
+}
+function formToCfg() {
+  const c = {};
+  for (const f of NUM_FIELDS) {
+    const v = $('f_' + f[0]).value.trim();
+    if (v !== '' && isFinite(Number(v))) c[f[0]] = Number(v);
+  }
+  if (!$('fx2').checked) c.x2_enabled = false;
+  const note = $('fnotice').value.trim();
+  if (note) c.notice = note;
+  return c;
+}
+function cfgToForm(c) {
+  for (const f of NUM_FIELDS) $('f_' + f[0]).value = c[f[0]] != null ? c[f[0]] : '';
+  $('fx2').checked = c.x2_enabled !== false;
+  $('fnotice').value = c.notice || '';
+  $('fraw').value = JSON.stringify(c, null, 2);
+}
+function syncRaw() { $('fraw').value = JSON.stringify(formToCfg(), null, 2); }
+async function loadConfig() {
+  try {
+    const d = await rpc('get_remote_config', {});
+    S.cfg = d.config || {};
+    cfgToForm(S.cfg);
+    const meta = 'config v' + d.version + ' · ' + String(d.updated_at || '').slice(0, 16).replace('T', ' ');
+    $('chipCfg').style.display = ''; $('chipCfg').innerHTML = '⚙️ <b>' + esc('v' + d.version) + '</b>';
+    $('chipCfg2').textContent = meta;
+  } catch (e) { say('err', 'Config load failed: ' + e.message); }
+}
+async function publishConfig() {
+  let c;
+  try { c = JSON.parse($('fraw').value || '{}'); }
+  catch (e) { return say('err', 'Raw JSON is invalid: ' + e.message); }
+  $('btnPublish').disabled = true;
+  try {
+    const d = await rpc('set_remote_config', { new_config: c });
+    S.cfg = d.config; cfgToForm(S.cfg);
+    $('chipCfg').innerHTML = '⚙️ <b>v' + d.version + '</b>';
+    $('chipCfg2').textContent = 'config v' + d.version + ' · just published';
+    say('ok', 'Published config v' + d.version + ' — installs pick it up on next launch.');
+  } catch (e) { say('err', 'Publish failed: ' + e.message); }
+  $('btnPublish').disabled = false;
+}
+
+/* ---------------------------------------------------------------- admins */
+async function loadAdmins() {
+  try {
+    const rows = await rpc('list_admins', {});
+    table($('tblAdmins'), rows || [], [['email', 'Email'], ['added_at', 'Added', v => String(v).slice(0, 10)]]);
+  } catch (e) { $('tblAdmins').innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; }
+}
+
+/* ------------------------------------------------------------------ boot */
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  for (const t of ['dash', 'cfg', 'admins']) $('tab-' + t).style.display = b.dataset.tab === t ? '' : 'none';
+}));
+$('btnConnect').addEventListener('click', () => {
+  const url = $('inUrl').value.trim().replace(/\/+$/, ''), key = $('inKey').value.trim();
+  if (!/^https:\/\/.+/.test(url) || key.length < 20) return say('err', 'Enter your project URL and anon key.');
+  S.url = url; S.key = key;
+  localStorage.setItem(LS.conn, JSON.stringify({ url, key }));
+  route();
+});
+$('btnReconn').addEventListener('click', () => { localStorage.removeItem(LS.conn); S.url = ''; S.key = ''; route(); });
+$('btnLogin').addEventListener('click', async () => {
+  try {
+    const d = await auth('token?grant_type=password', { email: $('inEmail').value.trim(), password: $('inPass').value });
+    S.session = d; localStorage.setItem(LS.sess, JSON.stringify(d));
+    route();
+  } catch (e) { say('err', 'Sign-in failed: ' + e.message); }
+});
+$('btnSignup').addEventListener('click', async () => {
+  try {
+    const d = await auth('signup', { email: $('inEmail').value.trim(), password: $('inPass').value });
+    if (d.access_token) { S.session = d; localStorage.setItem(LS.sess, JSON.stringify(d)); route(); }
+    else say('ok', 'Account created — confirm the email if required, then sign in.');
+  } catch (e) { say('err', 'Sign-up failed: ' + e.message); }
+});
+$('btnOut').addEventListener('click', signOut);
+$('btnPublish').addEventListener('click', publishConfig);
+$('btnReload').addEventListener('click', loadConfig);
+$('btnAddAdmin').addEventListener('click', async () => {
+  try {
+    await rpc('add_admin', { new_email: $('inNewAdmin').value.trim() });
+    $('inNewAdmin').value = '';
+    say('ok', 'Admin added.');
+    loadAdmins();
+  } catch (e) { say('err', e.message); }
+});
+
+cfgFieldsInit();
+(function boot() {
+  try {
+    const conn = JSON.parse(localStorage.getItem(LS.conn) || 'null');
+    if (conn) { S.url = conn.url; S.key = conn.key; }
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('url') && qs.get('key')) {
+      S.url = qs.get('url').replace(/\/+$/, ''); S.key = qs.get('key');
+      localStorage.setItem(LS.conn, JSON.stringify({ url: S.url, key: S.key }));
+    }
+    const sess = JSON.parse(localStorage.getItem(LS.sess) || 'null');
+    if (sess && sess.access_token) S.session = sess;
+  } catch (e) {}
+  route();
+})();
+</script>
+</body>
+</html>
