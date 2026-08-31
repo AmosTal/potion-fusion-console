@@ -255,10 +255,10 @@ const S = { url: '', key: '', session: null, admin: false, cfg: null, cfgMeta: n
 
 const NUM_FIELDS = [
   ['hint_cost',    'Hint cost (legacy)', 25],
-  ['shuffle_cost', 'Shuffle cost',       35],
+  ['shuffle_cost', 'Shuffle cost',       25],
   ['pipette_cost', 'Pipette powerup',     40],
-  ['catalyst_cost','Catalyst powerup',    60],
-  ['vial_cost',    '+Vial cost',         50],
+  ['catalyst_cost','Catalyst powerup',    45],
+  ['vial_cost',    '+Vial cost',         65],
   ['vial_max',     'Vials max / level',   2],
   ['gift_base',    'Daily gift base',    20],
   ['gift_per',     'Gift +/streak day',   5],
@@ -273,6 +273,10 @@ const NUM_FIELDS = [
   ['tank_star3',   'Tank star 3 (beauty)', 340],
   ['tank_mult',    'Per-tank goal x',      1.8],
   ['decor_price_mult', 'Ornament price x',   1],
+  ['moves_enabled',    'Move limit on (1/0)',  1],
+  ['move_slack',       'Move slack x',         1],
+  ['extra_moves',      '+Moves per purchase',  5],
+  ['extra_moves_cost', '+Moves cost',         60],
 ];
 /* Drop table — mirrors SPECIES in game/fish.js (name, default weight).
    Keep in sync when a species is added there. */
